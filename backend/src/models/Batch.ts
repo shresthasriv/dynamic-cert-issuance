@@ -44,7 +44,14 @@ const BatchSchema = new Schema<BatchDocument>({
     validRecords: Number,
     invalidRecords: Number,
     estimatedProcessingTime: Number,
-    errors: [String]
+    errors: [String],
+    missingPdfs: [String],
+    extraPdfs: [String],
+    batchBreakdown: [{
+      batchNumber: Number,
+      certificateCount: Number,
+      estimatedTime: Number
+    }]
   },
   createdAt: {
     type: String,

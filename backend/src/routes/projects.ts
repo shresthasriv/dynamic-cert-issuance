@@ -5,11 +5,12 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { Project, ApiResponse } from '../types';
 import { ProjectService } from '../services/projectService';
+import { BatchService } from '../services/batchService';
 
 const router = express.Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
+// Configure multer for template PDFs
+const templateStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const projectId = req.params.id || 'temp';
     const uploadPath = path.join(__dirname, '../../../uploads/projects', projectId);
@@ -30,8 +31,8 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({
-  storage,
+const templateUpload = multer({
+  storage: templateStorage,
   fileFilter: (req, file, cb) => {
     // Only allow PDF files for templates
     if (file.mimetype === 'application/pdf') {
@@ -42,6 +43,41 @@ const upload = multer({
   },
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+// Configure multer for batch ZIP files
+const batchStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const projectId = req.params.id;
+    const uploadPath = path.join(__dirname, '../../../uploads/projects', projectId, 'batches');
+    
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    cb(null, `batch_${timestamp}${ext}`);
+  }
+});
+
+const batchUpload = multer({
+  storage: batchStorage,
+  fileFilter: (req, file, cb) => {
+    // Only allow ZIP files for batch uploads
+    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only ZIP files are allowed for batch uploads'));
+    }
+  },
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB limit for ZIP files
   }
 });
 
@@ -157,7 +193,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/projects/:id/template - Upload template PDF
-router.post('/:id/template', upload.single('template'), async (req, res) => {
+router.post('/:id/template', templateUpload.single('template'), async (req, res) => {
   try {
     const project = await ProjectService.getProjectById(req.params.id);
     
@@ -202,6 +238,116 @@ router.post('/:id/template', upload.single('template'), async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to upload template PDF'
+    });
+  }
+});
+
+// POST /api/projects/:id/batch - Upload batch ZIP file
+router.post('/:id/batch', batchUpload.single('batchZip'), async (req, res) => {
+  try {
+    const project = await ProjectService.getProjectById(req.params.id);
+    
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+    }
+
+    // Check if project is ready for batch upload (has template and QR coordinates)
+    if (!project.templatePdfPath || !project.qrCoordinates) {
+      return res.status(400).json({
+        success: false,
+        error: 'Project must have template PDF and QR coordinates before uploading batch'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Batch ZIP file is required'
+      });
+    }
+
+    // Process the ZIP file and validate contents
+    const batch = await BatchService.processZipFile(req.params.id, req.file.path);
+
+    const response: ApiResponse = {
+      success: true,
+      data: batch,
+      message: batch.validationResults?.isValid 
+        ? 'Batch ZIP processed successfully'
+        : 'Batch ZIP processed with validation errors'
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error processing batch ZIP:', error);
+    
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to process batch ZIP'
+    });
+  }
+});
+
+// GET /api/projects/:id/batches - Get all batches for a project
+router.get('/:id/batches', async (req, res) => {
+  try {
+    const project = await ProjectService.getProjectById(req.params.id);
+    
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+    }
+
+    const batches = await BatchService.getBatchesByProject(req.params.id);
+
+    const response: ApiResponse = {
+      success: true,
+      data: batches
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching batches:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch batches'
+    });
+  }
+});
+
+// GET /api/projects/:id/batches/:batchId - Get specific batch details
+router.get('/:id/batches/:batchId', async (req, res) => {
+  try {
+    const batch = await BatchService.getBatchById(req.params.batchId);
+    
+    if (!batch || batch.projectId !== req.params.id) {
+      return res.status(404).json({
+        success: false,
+        error: 'Batch not found'
+      });
+    }
+
+    const response: ApiResponse = {
+      success: true,
+      data: batch
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching batch:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch batch'
     });
   }
 });
