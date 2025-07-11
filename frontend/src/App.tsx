@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Layout from './components/Layout';
 import CreateProject from './components/CreateProject';
 import ProjectList from './components/ProjectList';
+import BatchUpload from './components/BatchUpload';
 import './App.css';
 
 function App() {
@@ -15,7 +16,8 @@ function App() {
             <Route path="/projects" element={<ProjectList />} />
             <Route path="/projects/new" element={<CreateProject />} />
             <Route path="/projects/:id/step1" element={<CreateProject />} />
-            {/* Step 2 and 3 routes will be added later */}
+            <Route path="/projects/:id/step2" element={<BatchUpload />} />
+            {/* Step 3 route will be added later */}
             <Route path="*" element={<Navigate to="/projects" replace />} />
           </Routes>
         </Layout>
