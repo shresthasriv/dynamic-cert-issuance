@@ -32,13 +32,13 @@ export interface Batch {
 
 export interface Certificate {
   id: string;
+  certificateId: string;
   projectId: string;
   batchId: string;
-  certificateId: string;
   filename: string;
-  status: 'pending' | 'in-progress' | 'issued' | 'failed';
   recipientName?: string;
   recipientEmail?: string;
+  status: 'pending' | 'in-progress' | 'issued' | 'failed';
   issuedPdfPath?: string;
   qrCodeData?: string;
   verificationUrl?: string;

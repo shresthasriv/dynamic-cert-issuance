@@ -17,14 +17,16 @@ export class BatchService {
    */
   static async processZipFile(projectId: string, zipFilePath: string): Promise<Batch> {
     try {
-      // Extract ZIP contents
+      // Extract ZIP contents to a unique directory named after the zip file
       const extractPath = path.dirname(zipFilePath);
-      const extractedDir = path.join(extractPath, 'extracted');
+      const zipNameWithoutExt = path.basename(zipFilePath, path.extname(zipFilePath));
+      const extractedDir = path.join(extractPath, zipNameWithoutExt);
       
-      // Create extraction directory
-      if (!fs.existsSync(extractedDir)) {
-        fs.mkdirSync(extractedDir, { recursive: true });
+      // Create extraction directory, ensuring it's clean
+      if (fs.existsSync(extractedDir)) {
+        fs.rmSync(extractedDir, { recursive: true, force: true });
       }
+      fs.mkdirSync(extractedDir, { recursive: true });
 
       const zip = new AdmZip(zipFilePath);
       zip.extractAllTo(extractedDir, true);
@@ -65,10 +67,11 @@ export class BatchService {
         await this.createCertificateRecords(savedBatch._id.toString(), projectId, excelFilePath);
       }
 
-      // Clean up extracted files (but keep the original ZIP)
-      if (fs.existsSync(extractedDir)) {
-        fs.rmSync(extractedDir, { recursive: true, force: true });
-      }
+      // We will no longer clean up extracted files, so they are available for processing.
+      // A more robust system would have a cleanup job or manage storage lifecycle.
+      // if (fs.existsSync(extractedDir)) {
+      //   fs.rmSync(extractedDir, { recursive: true, force: true });
+      // }
 
       return this.transformDocument(savedBatch.toObject());
     } catch (error) {

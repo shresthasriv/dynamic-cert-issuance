@@ -1,5 +1,9 @@
 import { ProjectModel, ProjectDocument } from '../models/Project';
+import { BatchModel } from '../models/Batch';
+import { CertificateModel } from '../models/Certificate';
 import { Project } from '../types';
+import fs from 'fs';
+import path from 'path';
 
 export class ProjectService {
   /**
@@ -95,11 +99,38 @@ export class ProjectService {
   }
 
   /**
-   * Delete project
+   * Delete project and all associated data
    */
   static async deleteProject(id: string): Promise<boolean> {
     try {
+      // Get the project first to check if it exists
+      const project = await ProjectModel.findById(id).lean();
+      if (!project) {
+        return false;
+      }
+
+      // Delete all certificates associated with this project
+      await CertificateModel.deleteMany({ projectId: id });
+
+      // Delete all batches associated with this project
+      await BatchModel.deleteMany({ projectId: id });
+
+      // Delete project files and directories
+      const projectUploadDir = path.join(__dirname, '../../../uploads/projects', id);
+      if (fs.existsSync(projectUploadDir)) {
+        try {
+          fs.rmSync(projectUploadDir, { recursive: true, force: true });
+          console.log(`Deleted project files: ${projectUploadDir}`);
+        } catch (fileError) {
+          console.error(`Error deleting project files: ${fileError}`);
+          // Continue with database deletion even if file deletion fails
+        }
+      }
+
+      // Finally, delete the project itself
       const result = await ProjectModel.findByIdAndDelete(id);
+      
+      console.log(`Project ${id} and all associated data deleted successfully`);
       return !!result;
     } catch (error) {
       console.error('Error deleting project:', error);

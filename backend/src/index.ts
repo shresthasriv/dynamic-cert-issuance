@@ -5,12 +5,17 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
+import { createServer } from 'http';
 
 import { connectDatabase } from './config/database';
 import projectRoutes from './routes/projects';
+import { WebSocketService } from './services/websocketService';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Create HTTP server for WebSocket support
+const server = createServer(app);
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -23,6 +28,10 @@ const initializeApp = async () => {
   try {
     // Connect to MongoDB
     await connectDatabase();
+    
+    // Initialize WebSocket service
+    const websocketService = new WebSocketService(server);
+    console.log('✅ WebSocket service initialized');
     
     // Middleware
     app.use(helmet());
@@ -55,6 +64,7 @@ const initializeApp = async () => {
         success: true, 
         message: 'Certificate Issuance Portal API is running',
         database: 'MongoDB connected',
+        websockets: 'Socket.IO enabled',
         timestamp: new Date().toISOString()
       });
     });
@@ -77,11 +87,12 @@ const initializeApp = async () => {
       });
     });
 
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
       console.log(`📁 Uploads directory: ${uploadsDir}`);
       console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
       console.log(`🗄️  Database: MongoDB (Mongoose)`);
+      console.log(`🔌 WebSockets: Socket.IO enabled`);
     });
 
   } catch (error) {
