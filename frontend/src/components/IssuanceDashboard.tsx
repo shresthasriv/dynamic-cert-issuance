@@ -1,3 +1,19 @@
+/**
+ * IssuanceDashboard.tsx
+ * 
+ * Step 3 component - Main dashboard for certificate issuance management and monitoring.
+ * Provides real-time tracking of certificate processing, batch status management,
+ * and individual certificate actions. Integrates with WebSocket service for live updates.
+ * 
+ * Features:
+ * - Real-time certificate processing status updates via WebSockets
+ * - Batch selection and management
+ * - Individual certificate actions (retry, reissue, view)
+ * - Bulk operations for failed certificates
+ * - Progress tracking and status visualization
+ * - Certificate download and sharing functionality
+ * - Detailed error handling and user feedback
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Project, Batch, Certificate, BatchStatus } from '../types';
@@ -10,27 +26,48 @@ import BulkActions from './BulkActions';
 import CertificatesTable from './CertificatesTable';
 import { ChevronDown } from 'lucide-react';
 
+/**
+ * IssuanceDashboard Component
+ * 
+ * Main dashboard component for Step 3 of the certificate issuance process.
+ * Manages the entire certificate issuance lifecycle including batch processing,
+ * real-time status updates, and certificate management actions.
+ */
 const IssuanceDashboard: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   
+  // Core data state - manages project, batches, and certificates
   const [project, setProject] = useState<Project | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
+  
+  // UI state management
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // Modal and interaction state
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
   const [selectedCertificateIds, setSelectedCertificateIds] = useState<string[]>([]);
+  
+  // Action loading states
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
 
+  /**
+   * Loads batch-specific data including certificates and status
+   * Memoized with useCallback to prevent unnecessary re-renders
+   * 
+   * @param {string} projectId - The project ID
+   * @param {string} batchId - The batch ID to load data for
+   */
   const loadBatchData = useCallback(async (projectId: string, batchId: string) => {
     try {
+      // Load certificates and batch status in parallel for better performance
       const [certificatesResponse, statusResponse] = await Promise.all([
         projectApi.getBatchCertificates(projectId, batchId),
         projectApi.getBatchStatus(projectId, batchId)
@@ -50,6 +87,10 @@ const IssuanceDashboard: React.FC = () => {
     }
   }, []);
 
+  /**
+   * Effect to load initial dashboard data when component mounts
+   * Loads project details and available batches, sets up initial batch selection
+   */
   useEffect(() => {
     if (id) {
       const loadDashboardData = async (projectId: string) => {
@@ -57,6 +98,7 @@ const IssuanceDashboard: React.FC = () => {
           setLoading(true);
           setError(null);
 
+          // Load project and batches in parallel
           const [projectResponse, batchesResponse] = await Promise.all([
             projectApi.getProjectById(projectId),
             projectApi.getBatches(projectId)
@@ -72,6 +114,7 @@ const IssuanceDashboard: React.FC = () => {
           if (batchesResponse.success && batchesResponse.data) {
             setBatches(batchesResponse.data);
             
+            // Auto-select the first valid batch (has passed validation and is ready for processing)
             const validBatch = batchesResponse.data.find(b => 
               b.validationResults?.isValid && (b.status === 'pending' || b.status === 'processing' || b.status === 'completed')
             );
@@ -93,14 +136,24 @@ const IssuanceDashboard: React.FC = () => {
     }
   }, [id, loadBatchData]);
 
+  /**
+   * Effect to set up WebSocket connections and event listeners for real-time updates
+   * Manages batch processing events, certificate status changes, and cleanup
+   */
   useEffect(() => {
     if (!id || !selectedBatch) return;
 
+    // Connect to WebSocket and join relevant rooms
     websocketService.connect();
     websocketService.joinProject(id);
     websocketService.joinBatch(selectedBatch.id);
 
+    // Define WebSocket event handlers for real-time updates
     const handlers = {
+      /**
+       * Handles batch processing start event
+       * Updates UI to show processing state and initializes progress tracking
+       */
       onBatchStarted: (data: { batchId: string; totalCertificates: number }) => {
         if (data.batchId !== selectedBatch.id) return;
         console.log('Batch started:', data);
@@ -122,6 +175,11 @@ const IssuanceDashboard: React.FC = () => {
           };
         });
       },
+
+      /**
+       * Handles batch completion event
+       * Updates UI to show completed state and refreshes data
+       */
       onBatchCompleted: (data: { batchId: string }) => {
         if (data.batchId !== selectedBatch.id) return;
         console.log('Batch completed:', data);
@@ -130,6 +188,11 @@ const IssuanceDashboard: React.FC = () => {
         setSelectedBatch(prev => prev ? { ...prev, status: 'completed' } : null);
         loadBatchData(id, selectedBatch.id);
       },
+
+      /**
+       * Handles batch failure event
+       * Updates UI to show error state and refreshes data
+       */
       onBatchFailed: (data: { batchId: string }) => {
         if (data.batchId !== selectedBatch.id) return;
         console.log('Batch failed:', data);
@@ -138,6 +201,11 @@ const IssuanceDashboard: React.FC = () => {
         setSelectedBatch(prev => prev ? { ...prev, status: 'failed' } : null);
         loadBatchData(id, selectedBatch.id);
       },
+
+      /**
+       * Handles individual certificate processing start
+       * Updates certificate status to show in-progress state
+       */
       onCertificateStarted: (data: { certificateId: string }) => {
         setCertificates(prev => 
           prev.map(cert => 
@@ -147,7 +215,13 @@ const IssuanceDashboard: React.FC = () => {
           )
         );
       },
+
+      /**
+       * Handles individual certificate completion (success or failure)
+       * Updates certificate status and batch progress counters
+       */
       onCertificateCompleted: (data: { certificateId: string; status: 'issued' | 'failed'; error?: string }) => {
+        // Update individual certificate status
         setCertificates(prev => 
           prev.map(cert => 
             cert.id === data.certificateId 
@@ -163,11 +237,13 @@ const IssuanceDashboard: React.FC = () => {
           )
         );
 
+        // Update batch status counters for progress tracking
         setBatchStatus(prevStatus => {
           if (!prevStatus) return null;
           
           const newStatusCounts = { ...prevStatus.statusCounts };
           
+          // Decrement pending count and increment appropriate status count
           newStatusCounts.pending = (newStatusCounts.pending || 1) - 1;
           newStatusCounts[data.status] = (newStatusCounts[data.status] || 0) + 1;
     
@@ -177,6 +253,11 @@ const IssuanceDashboard: React.FC = () => {
           };
         });
       },
+
+      /**
+       * Handles certificate republish event
+       * Updates certificate timestamp and shows success message
+       */
       onCertificateRepublished: (data: { certificateId: string }) => {
         console.log('Certificate republished:', data);
         setSuccess('Certificate republished successfully!');
@@ -190,13 +271,18 @@ const IssuanceDashboard: React.FC = () => {
       }
     };
 
+    // Register WebSocket event handlers
     websocketService.onBatchEvents(handlers);
 
+    // Cleanup function to remove event listeners when component unmounts or dependencies change
     return () => {
       websocketService.offBatchEvents();
     };
   }, [id, selectedBatch, loadBatchData]);
 
+  /**
+   * Initiates batch processing by calling the API and setting up WebSocket monitoring
+   */
   const handleStartProcessing = async () => {
     if (!project || !selectedBatch) return;
 
@@ -206,6 +292,7 @@ const IssuanceDashboard: React.FC = () => {
       const response = await projectApi.startBatchIssuance(project.id, selectedBatch.id);
       
       if (response.success) {
+        // Join batch WebSocket room for real-time updates
         websocketService.joinBatch(selectedBatch.id);
         setSuccess('Certificate issuance started! You will see real-time updates below.');
       } else {
@@ -217,6 +304,12 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Handles individual certificate actions (retry or reissue)
+   * 
+   * @param {'retry' | 'reissue'} action - The action to perform
+   * @param {string} certificateId - ID of the certificate to act on
+   */
   const handleCertificateAction = async (action: 'retry' | 'reissue', certificateId: string) => {
     if (!project) return;
 
@@ -230,6 +323,7 @@ const IssuanceDashboard: React.FC = () => {
       
       if (response.success) {
         setSuccess(`Certificate ${action} initiated`);
+        // Reset certificate status to pending for processing
         setCertificates(prev => 
           prev.map(cert => 
             cert.id === certificateId 
@@ -246,11 +340,19 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Opens the certificate view modal for the selected certificate
+   * 
+   * @param {Certificate} certificate - Certificate to view
+   */
   const handleViewCertificate = (certificate: Certificate) => {
     setSelectedCertificate(certificate);
     setViewModalOpen(true);
   };
 
+  /**
+   * Downloads all certificates in the current batch as a ZIP file
+   */
   const handleDownloadAll = async () => {
     if (!project || !selectedBatch) return;
 
@@ -258,6 +360,7 @@ const IssuanceDashboard: React.FC = () => {
       setDownloadLoading(true);
       const blob = await projectApi.downloadAllCertificates(project.id, selectedBatch.id);
       
+      // Create download link and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -276,6 +379,11 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Handles bulk actions on selected certificates (retry or reissue multiple)
+   * 
+   * @param {'retry' | 'reissue'} action - The bulk action to perform
+   */
   const handleBulkAction = async (action: 'retry' | 'reissue') => {
     if (!project || selectedCertificateIds.length === 0) return;
 
@@ -293,6 +401,7 @@ const IssuanceDashboard: React.FC = () => {
         setSuccess(`Bulk ${action} initiated for ${selectedCertificateIds.length} certificates`);
         setSelectedCertificateIds([]);
         
+        // Reset selected certificates to pending status
         setCertificates(prev => 
           prev.map(cert => 
             selectedCertificateIds.includes(cert.id)
@@ -311,6 +420,12 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Handles individual certificate selection for bulk operations
+   * 
+   * @param {string} certificateId - ID of certificate to select/deselect
+   * @param {boolean} selected - Whether certificate should be selected
+   */
   const handleCertificateSelect = (certificateId: string, selected: boolean) => {
     if (selected) {
       setSelectedCertificateIds(prev => [...prev, certificateId]);
@@ -319,6 +434,12 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Handles select all/none functionality for bulk operations
+   * Only selects failed certificates as they are the ones that can be retried
+   * 
+   * @param {boolean} selected - Whether to select all or deselect all
+   */
   const handleSelectAll = (selected: boolean) => {
     if (selected) {
       const filteredCerts = certificates.filter(cert => cert.status === 'failed');
@@ -328,6 +449,12 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Handles batch selection change
+   * Switches to a different batch and loads its data
+   * 
+   * @param {string} batchId - ID of the batch to switch to
+   */
   const handleBatchChange = async (batchId: string) => {
     const batch = batches.find(b => b.id === batchId);
     if (batch && project) {
@@ -337,11 +464,20 @@ const IssuanceDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Clears all error and success messages
+   */
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
   };
 
+  /**
+   * Generates status badge component for certificate status display
+   * 
+   * @param {Certificate['status']} status - The certificate status
+   * @returns {React.ReactNode} Styled status badge component
+   */
   const getStatusBadge = (status: Certificate['status']): React.ReactNode => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium inline-block";
     let statusClasses = '';
@@ -372,6 +508,11 @@ const IssuanceDashboard: React.FC = () => {
     return <span className={`${baseClasses} ${statusClasses}`}>{statusText}</span>;
   };
 
+  /**
+   * Calculates overall batch processing progress as a percentage
+   * 
+   * @returns {number} Progress percentage (0-100)
+   */
   const getProgress = () => {
     if (!batchStatus || !certificates.length) return 0;
     
@@ -382,7 +523,7 @@ const IssuanceDashboard: React.FC = () => {
     return Math.round((completed / certificates.length) * 100);
   };
   
-  // Return statement with JSX
+  // Loading state render
   if (loading) {
     return (
       <div className="loading">
@@ -392,6 +533,7 @@ const IssuanceDashboard: React.FC = () => {
     );
   }
 
+  // Project not found state render
   if (!project) {
     return (
       <div className="error-state">
@@ -406,8 +548,10 @@ const IssuanceDashboard: React.FC = () => {
 
   return (
     <div className="main-content">
+      {/* Dashboard Header with Project Information */}
       {project && <DashboardHeader project={project} />}
 
+      {/* Error and Success Message Display */}
       {error && (
         <div className="alert alert-error">
           {error}
@@ -422,6 +566,7 @@ const IssuanceDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Batch Selection Dropdown */}
       {batches.length > 0 && (
       <div className="batch-selection">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
@@ -445,7 +590,7 @@ const IssuanceDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Batch Processing Controls */}
+      {/* Batch Processing Controls - Start/Stop Processing and Progress */}
       {selectedBatch && selectedBatch.validationResults?.isValid && (
         <BatchProcessingControls 
           selectedBatch={selectedBatch}
@@ -458,8 +603,10 @@ const IssuanceDashboard: React.FC = () => {
         />
       )}
 
+      {/* Main Certificate Management Interface */}
       {selectedBatch && certificates.length > 0 && (
         <>
+          {/* Bulk Actions Component */}
           <BulkActions 
             selectedBatch={selectedBatch}
             selectedCertificateIds={selectedCertificateIds}
@@ -468,6 +615,8 @@ const IssuanceDashboard: React.FC = () => {
             handleBulkAction={handleBulkAction}
             handleDownloadAll={handleDownloadAll}
           />
+          
+          {/* Certificates Table Component */}
           <CertificatesTable
             certificates={certificates}
             selectedCertificateIds={selectedCertificateIds}
@@ -480,6 +629,7 @@ const IssuanceDashboard: React.FC = () => {
         </>
       )}
 
+      {/* Certificate View Modal */}
       {selectedCertificate && (
         <CertificateViewModal
           certificate={selectedCertificate}
@@ -491,6 +641,7 @@ const IssuanceDashboard: React.FC = () => {
         />
       )}
 
+      {/* Empty State - No Certificates Found */}
       {selectedBatch && certificates.length === 0 && (
         <div className="empty-state">
           <h3>No Certificates Found</h3>

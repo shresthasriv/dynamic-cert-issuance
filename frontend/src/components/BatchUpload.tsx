@@ -1,3 +1,23 @@
+/**
+ * BatchUpload.tsx
+ * 
+ * Step 2 component for uploading and validating ZIP files containing certificate PDFs
+ * and Excel mapping files. Handles batch upload validation, file processing, and 
+ * displays detailed validation results to guide users through the upload process.
+ * 
+ * ZIP File Requirements:
+ * - One Excel file (.xlsx or .xls) with certificate mapping
+ * - PDF files named exactly as specified in Excel
+ * - Maximum 250 certificates per batch
+ * - ZIP file size limit: 100MB
+ * 
+ * Features:
+ * - Drag & drop file upload with validation
+ * - Real-time upload progress tracking
+ * - Comprehensive validation result display
+ * - Automatic batch breakdown for processing
+ * - Support for re-uploads and error correction
+ */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Batch } from '../types';
@@ -19,32 +39,54 @@ import {
   FileWarning,
 } from 'lucide-react';
 
+/**
+ * BatchUpload Component
+ * 
+ * Main component for Step 2 of the certificate issuance process. Allows users to
+ * upload ZIP files containing certificate PDFs and mapping Excel files, validates
+ * the content, and provides detailed feedback on the validation results.
+ */
 const BatchUpload: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Core data state
   const [project, setProject] = useState<any | null>(null); 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
+  
+  // UI state management
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
+  
+  // Message state
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  /**
+   * Effect to load project and batch data when component mounts
+   * or when project ID changes in the URL
+   */
   useEffect(() => {
     if (id) {
       loadProjectAndBatches(id);
     }
   }, [id]);
 
+  /**
+   * Loads project data and existing batches from the API
+   * Validates that the project is ready for batch upload (has template and coordinates)
+   * 
+   * @param {string} projectId - The project ID from URL parameters
+   */
   const loadProjectAndBatches = async (projectId: string) => {
     try {
       setLoading(true);
       
-      // Load project and batches in parallel
+      // Load project and batches in parallel for better performance
       const [projectResponse, batchesResponse] = await Promise.all([
         projectApi.getProjectById(projectId),
         projectApi.getBatches(projectId)
@@ -53,7 +95,7 @@ const BatchUpload: React.FC = () => {
       if (projectResponse.success && projectResponse.data) {
         setProject(projectResponse.data);
         
-        // Check if project is ready for batch upload
+        // Check if project is ready for batch upload - must have template and QR coordinates
         if (!projectResponse.data.templatePdfPath || !projectResponse.data.qrCoordinates) {
           setError('Project must have template PDF and QR coordinates before uploading batch. Please complete Step 1 first.');
           return;
@@ -79,8 +121,15 @@ const BatchUpload: React.FC = () => {
     }
   };
 
+  /**
+   * Validates uploaded file before processing
+   * Checks file type, size, and other requirements
+   * 
+   * @param {File} file - The uploaded file to validate
+   * @returns {string | null} Error message if validation fails, null if valid
+   */
   const validateFile = (file: File): string | null => {
-    // Check file type - allow various ZIP mime types
+    // Check file type - allow various ZIP mime types for browser compatibility
     const allowedTypes = [
       'application/zip',
       'application/x-zip-compressed',
@@ -93,7 +142,7 @@ const BatchUpload: React.FC = () => {
     }
 
     // Check file size (100MB limit)
-    const maxSize = 100 * 1024 * 1024; // 100MB
+    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
     if (file.size > maxSize) {
       return 'File size must be less than 100MB. Please reduce your ZIP file size.';
     }
@@ -101,7 +150,14 @@ const BatchUpload: React.FC = () => {
     return null;
   };
 
+  /**
+   * Handles the file upload process including validation and API call
+   * Shows upload progress and processes validation results
+   * 
+   * @param {File} file - The file to upload
+   */
   const handleFileUpload = async (file: File) => {
+    // Validate file before uploading
     const validationError = validateFile(file);
     if (validationError) {
       setError(validationError);
@@ -118,6 +174,7 @@ const BatchUpload: React.FC = () => {
       setUploadProgress(0);
       clearMessages();
 
+      // Upload file with progress tracking
       const response = await projectApi.uploadBatch(
         project.id, 
         file,
@@ -128,9 +185,11 @@ const BatchUpload: React.FC = () => {
       );
 
       if (response.success && response.data) {
+        // Update batch state with new upload
         setCurrentBatch(response.data);
         setBatches(prev => [response.data!, ...prev.filter(b => b.id !== response.data!.id)]);
         
+        // Show appropriate message based on validation results
         if (response.data.validationResults?.isValid) {
           setSuccess('Batch ZIP uploaded and validated successfully! All files are ready for processing.');
         } else {
@@ -148,6 +207,9 @@ const BatchUpload: React.FC = () => {
     }
   };
 
+  /**
+   * Handles file selection from file input
+   */
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -155,6 +217,9 @@ const BatchUpload: React.FC = () => {
     }
   };
 
+  /**
+   * Handles drag and drop file upload
+   */
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
@@ -165,31 +230,47 @@ const BatchUpload: React.FC = () => {
     }
   };
 
+  /**
+   * Handles drag over events for visual feedback
+   */
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(true);
   };
 
+  /**
+   * Handles drag leave events to reset visual state
+   */
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
   };
 
+  /**
+   * Triggers file input click when upload area is clicked
+   */
   const handleClick = () => {
     fileInputRef.current?.click();
   };
 
+  /**
+   * Clears error and success messages
+   */
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
   };
 
+  /**
+   * Navigates to Step 3 if current batch is valid
+   */
   const proceedToStep3 = () => {
     if (project && currentBatch?.validationResults?.isValid) {
       navigate(`/projects/${project.id}/step3`);
     }
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="loading">
@@ -198,6 +279,7 @@ const BatchUpload: React.FC = () => {
     );
   }
 
+  // Project not found state
   if (!project) {
     return (
       <div className="card">
@@ -213,8 +295,9 @@ const BatchUpload: React.FC = () => {
       {/* Step Indicator */}
       <StepIndicator currentStep={2} />
 
-      {/* Header */}
+      {/* Main Content Card */}
       <div className="card">
+        {/* Header with navigation */}
         <div className="card-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="card-title">Upload Certificate Batch</h2>
@@ -236,7 +319,7 @@ const BatchUpload: React.FC = () => {
           </div>
         </div>
 
-        {/* Messages */}
+        {/* Error and Success Messages */}
         {error && (
           <div className="alert alert-error">
             {error}
@@ -255,7 +338,7 @@ const BatchUpload: React.FC = () => {
           </div>
         )}
 
-        {/* Project Summary */}
+        {/* Project Summary - shows current project status */}
         <div className="project-summary">
           <h3 className="project-summary-title">
             <ClipboardList size={18} style={{ marginRight: '0.5rem' }} />
@@ -269,7 +352,7 @@ const BatchUpload: React.FC = () => {
           </div>
         </div>
 
-        {/* Instructions */}
+        {/* ZIP File Requirements Information */}
         <div className="info-box">
           <h4 className="info-box-title">
             <Package size={18} style={{ marginRight: '0.5rem' }} />
@@ -284,7 +367,7 @@ const BatchUpload: React.FC = () => {
           </ul>
         </div>
 
-        {/* File Upload Area */}
+        {/* File Upload Area with drag & drop support */}
         <div
           className={`file-upload ${dragOver ? 'dragover' : ''}`}
           onDrop={handleDrop}
@@ -297,6 +380,7 @@ const BatchUpload: React.FC = () => {
             pointerEvents: uploading ? 'none' : 'auto'
           }}
         >
+          {/* Hidden file input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -306,15 +390,18 @@ const BatchUpload: React.FC = () => {
             disabled={uploading}
           />
 
+          {/* Upload area icon */}
           <div className="file-upload-icon">
             {uploading ? <div className="spinner" /> : <UploadCloud />}
           </div>
 
+          {/* Upload state content */}
           {uploading ? (
             <div>
               <div style={{ marginBottom: '1rem' }}>
                 <strong>Uploading and processing ZIP file...</strong>
               </div>
+              {/* Progress bar */}
               <div style={{
                 width: '100%',
                 backgroundColor: '#e5e7eb',
@@ -347,7 +434,7 @@ const BatchUpload: React.FC = () => {
           )}
         </div>
 
-        {/* Current Batch Status */}
+        {/* Current Batch Validation Results */}
         {currentBatch && (
           <BatchValidationResults 
             batch={currentBatch} 
@@ -356,7 +443,7 @@ const BatchUpload: React.FC = () => {
           />
         )}
 
-        {/* Previous Batches */}
+        {/* Previous Batch History */}
         {batches.length > 1 && (
           <div style={{ marginTop: '2rem' }}>
             <h3 style={{ marginBottom: '1rem', color: '#ffffff' }}>Previous Batch Uploads</h3>
@@ -394,10 +481,23 @@ const BatchUpload: React.FC = () => {
   );
 };
 
-// Separate component for validation results display
+/**
+ * BatchValidationResults Component
+ * 
+ * Displays detailed validation results for an uploaded batch, including:
+ * - Validation status (passed/failed)
+ * - Summary statistics (total, valid, invalid entries)
+ * - Processing time estimates
+ * - Automatic batch breakdown
+ * - Detailed error messages
+ * - Missing/extra PDF file lists
+ */
 interface BatchValidationResultsProps {
+  /** The batch to display validation results for */
   batch: Batch;
+  /** Callback to trigger re-upload */
   onReupload: () => void;
+  /** Callback to proceed to Step 3 */
   onProceedToStep3: () => void;
 }
 
@@ -407,10 +507,17 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
 }) => {
   const validation = batch.validationResults;
   
+  // Don't render if no validation results available
   if (!validation) {
     return null;
   }
 
+  /**
+   * Formats processing time from minutes to human-readable string
+   * 
+   * @param {number} minutes - Time in minutes
+   * @returns {string} Formatted time string
+   */
   const formatTime = (minutes: number): string => {
     if (minutes < 1) return '< 1 minute';
     if (minutes < 60) return `${Math.round(minutes)} minutes`;
@@ -421,6 +528,7 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
 
   return (
     <div className={`validation-results ${validation.isValid ? 'validation-success' : 'validation-error'}`}>
+      {/* Validation Header with Status */}
       <div className="validation-header">
         <div className="validation-icon">
           {validation.isValid ? <FileCheck2 /> : <FileX2 />}
@@ -430,7 +538,7 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
         </h3>
       </div>
 
-      {/* Validation Summary */}
+      {/* Validation Summary Statistics */}
       <div className="validation-summary">
         <div className="summary-item">
           <div className="summary-label">Total Entries</div>
@@ -453,7 +561,7 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
         </div>
       </div>
 
-      {/* Batch Breakdown */}
+      {/* Automatic Batch Breakdown for Processing */}
       {validation.batchBreakdown.length > 0 && (
         <div className="batch-breakdown">
           <h4 className="breakdown-title">
@@ -471,7 +579,7 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
         </div>
       )}
 
-      {/* Validation Errors */}
+      {/* Validation Error Details */}
       {validation.errors.length > 0 && (
         <div className="validation-errors">
           <h4 className="error-title">
@@ -488,9 +596,10 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
         </div>
       )}
 
-      {/* Missing/Extra PDF Details */}
+      {/* Missing and Extra PDF File Details */}
       {(validation.missingPdfs.length > 0 || validation.extraPdfs.length > 0) && (
         <div className="pdf-details">
+          {/* Missing PDF Files Section */}
           {validation.missingPdfs.length > 0 && (
             <div className="pdf-section">
               <h5 className="pdf-section-title error-text">
@@ -505,6 +614,7 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
             </div>
           )}
 
+          {/* Extra PDF Files Section */}
           {validation.extraPdfs.length > 0 && (
             <div className="pdf-section">
               <h5 className="pdf-section-title warning-text">

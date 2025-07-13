@@ -1154,7 +1154,7 @@ body {
   .card {
     padding: 1rem;
   }
-
+  
   .step-indicator {
     flex-direction: column;
     align-items: flex-start;

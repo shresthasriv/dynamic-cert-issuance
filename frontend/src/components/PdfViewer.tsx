@@ -1,3 +1,18 @@
+/**
+ * PdfViewer.tsx
+ * 
+ * Interactive PDF viewer component that allows users to click on a PDF template
+ * to set QR code coordinates. This is used in Step 1 of the certificate creation
+ * process to define where QR codes should be placed on issued certificates.
+ * 
+ * Features:
+ * - PDF rendering with react-pdf
+ * - Click-to-position QR code functionality  
+ * - Zoom controls for precise positioning
+ * - Coordinate conversion from pixels to percentages
+ * - Real-time coordinate display and validation
+ * - Error handling for PDF loading issues
+ */
 import React, { useState, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Project } from '../types';
@@ -18,32 +33,61 @@ import {
 // Set up PDF.js worker - using react-pdf's pdfjs instance
 pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
 
+/**
+ * Props interface for PdfViewer component
+ */
 interface PdfViewerProps {
+  /** Project containing the PDF template and existing coordinates */
   project: Project;
+  /** Callback fired when coordinates are successfully saved */
   onCoordinatesSaved: (project: Project) => void;
+  /** Callback fired when an error occurs */
   onError: (error: string) => void;
 }
 
+/**
+ * PdfViewer Component
+ * 
+ * Renders an interactive PDF viewer that allows users to click anywhere on the PDF
+ * to set QR code coordinates. Coordinates are converted from pixel positions to 
+ * percentage-based positions for consistent placement across different PDF sizes.
+ */
 const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onError }) => {
+  // PDF document state
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.2);
+  
+  // QR coordinate state - stores percentage-based coordinates (0-100)
   const [coordinates, setCoordinates] = useState<{ x: number; y: number } | null>(
     project.qrCoordinates || null
   );
+  
+  // UI state
   const [saving, setSaving] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  
+  // Reference to the PDF canvas container for coordinate calculations
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  // Construct PDF URL from project template path
   const pdfUrl = project.templatePdfPath 
     ? `http://localhost:5000/${project.templatePdfPath}`
     : null;
 
+  /**
+   * Handles successful PDF document loading
+   * Sets the total number of pages and clears any previous errors
+   */
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPdfError(null);
   };
 
+  /**
+   * Handles PDF document loading errors
+   * Displays user-friendly error messages and logs detailed errors
+   */
   const onDocumentLoadError = (error: any) => {
     console.error('Error loading PDF:', error);
     const errorMsg = `Failed to load PDF: ${error?.message || 'Unknown error'}`;
@@ -51,18 +95,26 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
     onError(errorMsg);
   };
 
+  /**
+   * Handles click events on the PDF canvas to set QR code position
+   * Converts screen coordinates to percentage-based coordinates for consistent placement
+   * 
+   * @param {React.MouseEvent<HTMLDivElement>} event - Click event on PDF canvas
+   */
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!canvasRef.current) return;
 
+    // Get click position relative to the PDF canvas
     const rect = canvasRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Convert to relative coordinates (0-1)
+    // Convert to relative coordinates (0-1) then to percentages (0-100)
+    // This ensures coordinates work regardless of PDF zoom level or screen size
     const relativeX = x / rect.width;
     const relativeY = y / rect.height;
 
-    // Store as percentage coordinates
+    // Store as percentage coordinates for consistent placement
     const newCoordinates = {
       x: Math.round(relativeX * 100),
       y: Math.round(relativeY * 100)
@@ -71,6 +123,10 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
     setCoordinates(newCoordinates);
   };
 
+  /**
+   * Saves the current QR code coordinates to the backend
+   * Validates that coordinates are set before attempting to save
+   */
   const handleSaveCoordinates = async () => {
     if (!coordinates) {
       onError('Please click on the PDF to set QR code position');
@@ -94,18 +150,28 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
     }
   };
 
+  /**
+   * Increases PDF zoom level (max 3.0x)
+   */
   const handleZoomIn = () => {
     setScale(prev => Math.min(prev + 0.2, 3.0));
   };
 
+  /**
+   * Decreases PDF zoom level (min 0.5x)
+   */
   const handleZoomOut = () => {
     setScale(prev => Math.max(prev - 0.2, 0.5));
   };
 
+  /**
+   * Resets zoom level to default (1.2x)
+   */
   const handleResetZoom = () => {
     setScale(1.2);
   };
 
+  // Early return if no PDF template is available
   if (!pdfUrl) {
     return (
       <div className="alert alert-error">
@@ -116,12 +182,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
 
   return (
     <div>
+      {/* Component Header */}
       <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
         <Crosshair />
         Set QR Code Position
       </h3>
 
-      {/* Instructions */}
+      {/* Instructions for user interaction */}
       <div className="pdf-instructions">
         <h4>
           <MousePointerClick size={18} style={{ marginRight: '0.5rem' }} />
@@ -140,8 +207,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
         </div>
       )}
 
-      {/* PDF Controls */}
+      {/* PDF Controls - Navigation and Zoom */}
       <div className="pdf-controls">
+        {/* Page Navigation Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
@@ -165,6 +233,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
             </button>
           </div>
 
+          {/* Zoom Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
               onClick={handleZoomOut}
@@ -193,6 +262,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
           </div>
         </div>
 
+        {/* Coordinate Display and Save Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {coordinates && (
             <span className="pdf-position-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -217,14 +287,16 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
         </div>
       </div>
 
-      {/* PDF Viewer */}
+      {/* PDF Viewer Container */}
       <div className="pdf-viewer">
         <div className="pdf-canvas-container">
+          {/* Clickable PDF Canvas - positioned relatively for coordinate calculation */}
           <div
             ref={canvasRef}
             onClick={handleCanvasClick}
             style={{ position: 'relative', display: 'inline-block' }}
           >
+            {/* React-PDF Document Component */}
             <Document
               file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
@@ -248,7 +320,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
               />
             </Document>
 
-            {/* QR Position Marker */}
+            {/* QR Position Marker - shows selected coordinate as visual indicator */}
             {coordinates && canvasRef.current && (
               <div
                 className="qr-marker"
@@ -286,7 +358,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
         </div>
       )}
 
-      {/* Tips */}
+      {/* User Tips and Instructions */}
       <div className="pdf-tips">
         <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Lightbulb size={18} />
