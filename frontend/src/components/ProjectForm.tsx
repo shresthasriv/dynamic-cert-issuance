@@ -93,23 +93,15 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, onProjectCreated, on
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // Clear error when user starts typing
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
   return (
     <div>
-      <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
+      <h3 className="form-section-title">
         📋 Project Information
       </h3>
 
@@ -124,12 +116,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, onProjectCreated, on
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className={`form-input ${errors.name ? 'error' : ''}`}
+            className={`form-input ${errors.name ? 'form-input-error' : ''}`}
             placeholder="e.g., Computer Science Graduation 2024"
             disabled={loading}
-            style={{
-              borderColor: errors.name ? '#ef4444' : undefined
-            }}
           />
           {errors.name && <div className="form-error">{errors.name}</div>}
         </div>
@@ -159,12 +148,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, onProjectCreated, on
             name="issuer"
             value={formData.issuer}
             onChange={handleChange}
-            className={`form-input ${errors.issuer ? 'error' : ''}`}
+            className={`form-input ${errors.issuer ? 'form-input-error' : ''}`}
             placeholder="e.g., University of Technology"
             disabled={loading}
-            style={{
-              borderColor: errors.issuer ? '#ef4444' : undefined
-            }}
           />
           {errors.issuer && <div className="form-error">{errors.issuer}</div>}
         </div>
@@ -179,50 +165,34 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, onProjectCreated, on
             name="issueDate"
             value={formData.issueDate}
             onChange={handleChange}
-            className={`form-input ${errors.issueDate ? 'error' : ''}`}
+            className={`form-input ${errors.issueDate ? 'form-input-error' : ''}`}
             disabled={loading}
             min={new Date().toISOString().split('T')[0]}
-            style={{
-              borderColor: errors.issueDate ? '#ef4444' : undefined
-            }}
           />
           {errors.issueDate && <div className="form-error">{errors.issueDate}</div>}
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+        <div className="form-actions">
           <button
             type="submit"
             className="btn btn-primary"
             disabled={loading}
-            style={{
-              opacity: loading ? 0.6 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
           >
             {loading ? (
               <>
-                <div className="spinner" style={{ width: '1rem', height: '1rem' }} />
+                <div className="spinner" />
                 Creating...
               </>
             ) : (
-              <>
-                📝 Create Project
-              </>
+              '📝 Create Project'
             )}
           </button>
         </div>
       </form>
 
-      {/* Instructions */}
-      <div style={{
-        marginTop: '2rem',
-        padding: '1rem',
-        backgroundColor: '#eff6ff',
-        borderRadius: '0.5rem',
-        borderLeft: '4px solid #3b82f6'
-      }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>💡 Instructions</h4>
-        <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#374151' }}>
+      <div className="info-box">
+        <h4 className="info-box-title">💡 Instructions</h4>
+        <ul className="info-box-list">
           <li>Choose a unique project name that describes your certificate batch</li>
           <li>The issuer will appear on all certificates</li>
           <li>Set the official issue date for all certificates in this batch</li>

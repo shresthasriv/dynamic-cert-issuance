@@ -30,6 +30,26 @@ export interface Batch {
   updatedAt: string;
 }
 
+// Types for Step 3 certificate issuance
+export interface Certificate {
+  id: string;
+  projectId: string;
+  batchId: string;
+  certificateId: string;
+  filename: string;
+  status: 'pending' | 'in-progress' | 'issued' | 'failed';
+  recipientName?: string;
+  recipientEmail?: string;
+  issuedPdfPath?: string;
+  qrCodeData?: string;
+  verificationUrl?: string;
+  errorMessage?: string;
+  processingStartedAt?: string;
+  processingCompletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ValidationResults {
   isValid: boolean;
   totalEntries: number;
@@ -46,6 +66,14 @@ export interface BatchBreakdown {
   batchNumber: number;
   certificateCount: number;
   estimatedTime: number; // in minutes
+}
+
+// Real-time status updates
+export interface BatchStatus {
+  batch: Batch;
+  certificates: Certificate[];
+  statusCounts: Record<string, number>;
+  isProcessing: boolean;
 }
 
 // API Response wrapper

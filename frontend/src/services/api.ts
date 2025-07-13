@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Project, Batch, ApiResponse } from '../types';
+import { Project, Batch, Certificate, BatchStatus, ApiResponse } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -109,6 +109,80 @@ export const projectApi = {
   // Get specific batch details
   getBatch: async (projectId: string, batchId: string): Promise<ApiResponse<Batch>> => {
     const response = await api.get(`/projects/${projectId}/batches/${batchId}`);
+    return response.data;
+  },
+
+  // Step 3: Certificate Issuance APIs
+  
+  // Start batch issuance
+  startBatchIssuance: async (projectId: string, batchId: string): Promise<ApiResponse> => {
+    const response = await api.post(`/projects/${projectId}/batches/${batchId}/start-issuance`);
+    return response.data;
+  },
+
+  // Get all certificates for a project
+  getCertificates: async (projectId: string): Promise<ApiResponse<Certificate[]>> => {
+    const response = await api.get(`/projects/${projectId}/certificates`);
+    return response.data;
+  },
+
+  // Get certificates for a specific batch
+  getBatchCertificates: async (projectId: string, batchId: string): Promise<ApiResponse<Certificate[]>> => {
+    const response = await api.get(`/projects/${projectId}/batches/${batchId}/certificates`);
+    return response.data;
+  },
+
+  // Get batch processing status
+  getBatchStatus: async (projectId: string, batchId: string): Promise<ApiResponse<BatchStatus>> => {
+    const response = await api.get(`/projects/${projectId}/batches/${batchId}/status`);
+    return response.data;
+  },
+
+  // Retry failed certificate
+  retryCertificate: async (projectId: string, certificateId: string): Promise<ApiResponse> => {
+    const response = await api.post(`/projects/${projectId}/certificates/${certificateId}/retry`);
+    return response.data;
+  },
+
+  // Reissue certificate (new functionality)
+  reissueCertificate: async (projectId: string, certificateId: string): Promise<ApiResponse> => {
+    const response = await api.post(`/projects/${projectId}/certificates/${certificateId}/reissue`);
+    return response.data;
+  },
+
+  // Republish certificate (new functionality)
+  republishCertificate: async (projectId: string, certificateId: string): Promise<ApiResponse> => {
+    const response = await api.post(`/projects/${projectId}/certificates/${certificateId}/republish`);
+    return response.data;
+  },
+
+  // Download all certificates as ZIP (new functionality)
+  downloadAllCertificates: async (projectId: string, batchId: string): Promise<Blob> => {
+    const response = await api.get(`/projects/${projectId}/batches/${batchId}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  // Bulk retry failed certificates
+  bulkRetryCertificates: async (projectId: string, certificateIds: string[]): Promise<ApiResponse> => {
+    const response = await api.post(`/projects/${projectId}/certificates/bulk-retry`, {
+      certificateIds
+    });
+    return response.data;
+  },
+
+  // Bulk reissue certificates
+  bulkReissueCertificates: async (projectId: string, certificateIds: string[]): Promise<ApiResponse> => {
+    const response = await api.post(`/projects/${projectId}/certificates/bulk-reissue`, {
+      certificateIds
+    });
+    return response.data;
+  },
+
+  // Delete project
+  deleteProject: async (projectId: string): Promise<ApiResponse> => {
+    const response = await api.delete(`/projects/${projectId}`);
     return response.data;
   },
 }; 

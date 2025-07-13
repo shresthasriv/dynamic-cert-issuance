@@ -6,6 +6,7 @@ import StepIndicator from './StepIndicator';
 import ProjectForm from './ProjectForm';
 import PdfUpload from './PdfUpload';
 import PdfViewer from './PdfViewer';
+import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 const CreateProject: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,13 +31,10 @@ const CreateProject: React.FC = () => {
       const response = await projectApi.getProjectById(projectId);
       if (response.success && response.data) {
         setProject(response.data);
-        // Determine which step to show based on project state
-        if (response.data.qrCoordinates) {
-          setStep('coordinates');
-        } else if (response.data.templatePdfPath) {
-          setStep('coordinates');
-        } else {
+        if (!response.data.templatePdfPath) {
           setStep('upload');
+        } else {
+          setStep('coordinates');
         }
       } else {
         setError('Project not found');
@@ -93,13 +91,25 @@ const CreateProject: React.FC = () => {
       {/* Header */}
       <div className="card">
         <div className="card-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="header-flex">
             <h2 className="card-title">
               {isEditing ? 'Edit Project & Template' : 'Create Project & Upload Template'}
             </h2>
-            <Link to="/projects" className="btn btn-secondary">
-              ← Back to Projects
-            </Link>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <Link to="/projects" className="btn btn-secondary">
+                <ArrowLeft size={16} />
+                Back to Projects
+              </Link>
+              {project && project.qrCoordinates && (
+                <button 
+                  onClick={handleNextStep}
+                  className="btn btn-primary"
+                >
+                  Continue to Step 2
+                  <ArrowRight size={16} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -109,15 +119,9 @@ const CreateProject: React.FC = () => {
             {error}
             <button 
               onClick={clearMessages}
-              style={{ 
-                float: 'right', 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer',
-                fontSize: '1.2rem'
-              }}
+              className="alert-close"
             >
-              ×
+              <X size={18} />
             </button>
           </div>
         )}
@@ -127,15 +131,9 @@ const CreateProject: React.FC = () => {
             {success}
             <button 
               onClick={clearMessages}
-              style={{ 
-                float: 'right', 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer',
-                fontSize: '1.2rem'
-              }}
+              className="alert-close"
             >
-              ×
+              <X size={18} />
             </button>
           </div>
         )}
@@ -158,36 +156,11 @@ const CreateProject: React.FC = () => {
         )}
 
         {step === 'coordinates' && project && project.templatePdfPath && (
-          <div>
-            <PdfViewer 
-              project={project}
-              onCoordinatesSaved={handleCoordinatesSaved}
-              onError={setError}
-            />
-            
-            {/* Next Step Button */}
-            {project.qrCoordinates && (
-              <div style={{ 
-                marginTop: '2rem', 
-                padding: '1rem', 
-                backgroundColor: '#f8fafc', 
-                borderRadius: '0.5rem',
-                textAlign: 'center'
-              }}>
-                <h3 style={{ marginBottom: '1rem' }}>✅ Step 1 Complete!</h3>
-                <p style={{ marginBottom: '1.5rem', color: '#6b7280' }}>
-                  Your project is set up and ready for bulk certificate processing.
-                </p>
-                <button 
-                  onClick={handleNextStep}
-                  className="btn btn-primary"
-                  style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
-                >
-                  Continue to Step 2: Upload Certificate Batch →
-                </button>
-              </div>
-            )}
-          </div>
+          <PdfViewer 
+            project={project}
+            onCoordinatesSaved={handleCoordinatesSaved}
+            onError={setError}
+          />
         )}
       </div>
     </div>

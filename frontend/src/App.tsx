@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import CreateProject from './components/CreateProject';
 import ProjectList from './components/ProjectList';
 import BatchUpload from './components/BatchUpload';
+import IssuanceDashboard from './components/IssuanceDashboard';
 import './App.css';
 
 function App() {
@@ -17,7 +18,7 @@ function App() {
             <Route path="/projects/new" element={<CreateProject />} />
             <Route path="/projects/:id/step1" element={<CreateProject />} />
             <Route path="/projects/:id/step2" element={<BatchUpload />} />
-            {/* Step 3 route will be added later */}
+            <Route path="/projects/:id/step3" element={<IssuanceDashboard />} />
             <Route path="*" element={<Navigate to="/projects" replace />} />
           </Routes>
         </Layout>

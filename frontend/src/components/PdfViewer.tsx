@@ -1,7 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Project } from '../types';
 import { projectApi } from '../services/api';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ZoomIn,
+  ZoomOut,
+  RefreshCw,
+  Save,
+  Check,
+  MousePointerClick,
+  Crosshair,
+  Lightbulb,
+} from 'lucide-react';
 
 // Set up PDF.js worker - using react-pdf's pdfjs instance
 pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
@@ -20,7 +32,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
     project.qrCoordinates || null
   );
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -28,18 +39,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
     ? `http://localhost:5000/${project.templatePdfPath}`
     : null;
 
-  // Debug logging
-  useEffect(() => {
-    console.log('PdfViewer - project:', project);
-    console.log('PdfViewer - pdfUrl:', pdfUrl);
-    console.log('PdfViewer - worker src:', pdfjs.GlobalWorkerOptions.workerSrc);
-    console.log('PdfViewer - pdfjs version:', pdfjs.version);
-  }, [project, pdfUrl]);
-
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    console.log('PDF loaded successfully, pages:', numPages);
     setNumPages(numPages);
-    setLoading(false);
     setPdfError(null);
   };
 
@@ -48,7 +49,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
     const errorMsg = `Failed to load PDF: ${error?.message || 'Unknown error'}`;
     setPdfError(errorMsg);
     onError(errorMsg);
-    setLoading(false);
   };
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -116,59 +116,27 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
 
   return (
     <div>
-      <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
-        🎯 Set QR Code Position
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
+        <Crosshair />
+        Set QR Code Position
       </h3>
 
       {/* Instructions */}
-      <div style={{
-        padding: '1rem',
-        backgroundColor: '#fffbeb',
-        borderRadius: '0.5rem',
-        marginBottom: '2rem',
-        border: '1px solid #fed7aa'
-      }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', color: '#92400e' }}>
-          📍 Click to Position QR Code
+      <div className="pdf-instructions">
+        <h4>
+          <MousePointerClick size={18} style={{ marginRight: '0.5rem' }} />
+          Click to Position QR Code
         </h4>
-        <div style={{ fontSize: '0.875rem', color: '#92400e' }}>
+        <div>
           Click anywhere on the PDF below to set where the QR code should appear on certificates. 
           {coordinates && ` Current position: ${coordinates.x}%, ${coordinates.y}%`}
         </div>
       </div>
 
-      {/* Debug Information */}
-      <div style={{
-        padding: '1rem',
-        backgroundColor: '#f3f4f6',
-        borderRadius: '0.5rem',
-        marginBottom: '1rem',
-        fontSize: '0.875rem'
-      }}>
-        <div><strong>Debug Info:</strong></div>
-        <div>PDF URL: {pdfUrl}</div>
-        <div>Worker: {pdfjs.GlobalWorkerOptions.workerSrc}</div>
-        <div>PDF.js Version: {pdfjs.version}</div>
-        <div>Loading: {loading ? 'Yes' : 'No'}</div>
-        <div>Error: {pdfError || 'None'}</div>
-        <div>Pages: {numPages}</div>
-      </div>
-
       {/* Error Display */}
       {pdfError && (
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#fee2e2',
-          borderRadius: '0.5rem',
-          marginBottom: '2rem',
-          border: '1px solid #fecaca'
-        }}>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: '#dc2626' }}>
-            ❌ PDF Loading Error
-          </h4>
-          <div style={{ fontSize: '0.875rem', color: '#dc2626' }}>
-            {pdfError}
-          </div>
+        <div className="pdf-error-box">
+          <strong>Error:</strong> {pdfError}
         </div>
       )}
 
@@ -180,20 +148,20 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
               onClick={() => setPageNumber(prev => Math.max(prev - 1, 1))}
               disabled={pageNumber <= 1}
               className="btn btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.5rem' }}
+              title="Previous Page"
             >
-              ←
+              <ArrowLeft size={16} />
             </button>
-            <span style={{ fontSize: '0.875rem' }}>
+            <span className="pdf-zoom-text">
               Page {pageNumber} of {numPages}
             </span>
             <button
               onClick={() => setPageNumber(prev => Math.min(prev + 1, numPages))}
               disabled={pageNumber >= numPages}
               className="btn btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.5rem' }}
+              title="Next Page"
             >
-              →
+              <ArrowRight size={16} />
             </button>
           </div>
 
@@ -201,43 +169,50 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
             <button
               onClick={handleZoomOut}
               className="btn btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.5rem' }}
+              title="Zoom Out"
             >
-              -
+              <ZoomOut size={16} />
             </button>
-            <span style={{ fontSize: '0.875rem', minWidth: '3rem', textAlign: 'center' }}>
+            <span className="pdf-zoom-text" style={{ minWidth: '3rem', textAlign: 'center' }}>
               {Math.round(scale * 100)}%
             </span>
             <button
               onClick={handleZoomIn}
               className="btn btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.5rem' }}
+              title="Zoom In"
             >
-              +
+              <ZoomIn size={16} />
             </button>
             <button
               onClick={handleResetZoom}
               className="btn btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.5rem' }}
+              title="Reset Zoom"
             >
-              Reset
+              <RefreshCw size={16} />
             </button>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {coordinates && (
-            <span style={{ fontSize: '0.875rem', color: '#059669' }}>
-              ✓ QR Position: {coordinates.x}%, {coordinates.y}%
+            <span className="pdf-position-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <Check size={16} />
+              QR Position: {coordinates.x}%, {coordinates.y}%
             </span>
           )}
           <button
             onClick={handleSaveCoordinates}
             disabled={!coordinates || saving}
             className="btn btn-primary"
-            style={{ fontSize: '0.75rem' }}
           >
-            {saving ? 'Saving...' : 'Save Position'}
+            {saving ? (
+              'Saving...'
+            ) : (
+              <>
+                <Save size={16} />
+                Save Position
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -290,19 +265,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
 
       {/* Current Coordinates Display */}
       {coordinates && (
-        <div style={{
-          marginTop: '1rem',
-          padding: '1rem',
-          backgroundColor: '#dcfce7',
-          borderRadius: '0.5rem',
-          border: '1px solid #bbf7d0'
-        }}>
+        <div className="pdf-coordinates-display">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontWeight: 600, color: '#166534' }}>
+              <div className="coordinates-title">
                 QR Code Position Set
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#166534' }}>
+              <div className="coordinates-value">
                 X: {coordinates.x}%, Y: {coordinates.y}%
               </div>
             </div>
@@ -318,15 +287,12 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ project, onCoordinatesSaved, onEr
       )}
 
       {/* Tips */}
-      <div style={{
-        marginTop: '2rem',
-        padding: '1rem',
-        backgroundColor: '#eff6ff',
-        borderRadius: '0.5rem',
-        borderLeft: '4px solid #3b82f6'
-      }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>💡 Tips</h4>
-        <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#374151' }}>
+      <div className="pdf-tips">
+        <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Lightbulb size={18} />
+          Tips
+        </h4>
+        <ul>
           <li>Click on an empty area of the certificate where you want the QR code to appear</li>
           <li>Use zoom controls to position the QR code more precisely</li>
           <li>The red circle shows where the QR code will be placed</li>

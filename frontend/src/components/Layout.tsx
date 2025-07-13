@@ -8,7 +8,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="layout">
       <header className="header">
-        <h1>🏆 Certificate Issuance Portal</h1>
+        <img 
+          src="/AI-CERTs-R-logo.svg" 
+          alt="AI CERTs" 
+          className="logo"
+          style={{ height: '40px' }}
+        />
       </header>
       <main className="main-content">
         {children}

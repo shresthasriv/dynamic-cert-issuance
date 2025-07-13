@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Project } from '../types';
 import { projectApi } from '../services/api';
+import { Plus, Edit, ArrowRight, Trash2, FolderOpen, Loader2 } from 'lucide-react';
 
 const ProjectList: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -29,8 +32,56 @@ const ProjectList: React.FC = () => {
     }
   };
 
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the project "${projectName}"?\n\n` +
+      'This will permanently delete:\n' +
+      '• The project and all its data\n' +
+      '• All uploaded batches and certificates\n' +
+      '• All associated files\n\n' +
+      'This action cannot be undone!'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingProjectId(projectId);
+      setError(null);
+      setSuccess(null);
+
+      const response = await projectApi.deleteProject(projectId);
+      
+      if (response.success) {
+        setSuccess(`Project "${projectName}" deleted successfully`);
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+      } else {
+        setError(response.error || 'Failed to delete project');
+      }
+    } catch (error: any) {
+      console.error('Error deleting project:', error);
+      setError(error.message || 'Failed to delete project');
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
+
+  const clearMessages = () => {
+    setError(null);
+    setSuccess(null);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const getStatusBadge = (project: Project) => {
+    if (!project.templatePdfPath) {
+      return { className: 'status-badge status-setup', text: 'Setup Required' };
+    }
+    if (!project.qrCoordinates) {
+      return { className: 'status-badge status-template', text: 'Template Uploaded' };
+    }
+    return { className: 'status-badge status-ready', text: 'Ready' };
   };
 
   if (loading) {
@@ -45,10 +96,11 @@ const ProjectList: React.FC = () => {
     <div>
       <div className="card">
         <div className="card-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="card-title">Certificate Projects</h2>
+          <div className="header-flex">
+            <h1 className="card-title" style={{ fontSize: '1.5rem' }}>Your Projects</h1>
             <Link to="/projects/new" className="btn btn-primary">
-              + Create New Project
+              <Plus size={18} />
+              Create New Project
             </Link>
           </div>
         </div>
@@ -56,102 +108,103 @@ const ProjectList: React.FC = () => {
         {error && (
           <div className="alert alert-error">
             {error}
+            <button onClick={clearMessages} className="alert-close">×</button>
+          </div>
+        )}
+
+        {success && (
+          <div className="alert alert-success">
+            {success}
+            <button onClick={clearMessages} className="alert-close">×</button>
           </div>
         )}
 
         {projects.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
-            <h3>No projects yet</h3>
-            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-              Create your first certificate project to get started
+          <div className="empty-projects">
+            <FolderOpen size={48} className="empty-icon" />
+            <h2>No Projects Found</h2>
+            <p className="empty-description">
+              Get started by creating your first certificate project.
             </p>
             <Link to="/projects/new" className="btn btn-primary">
+              <Plus size={18} />
               Create Your First Project
             </Link>
           </div>
         ) : (
-          <div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>
-                      Project Name
-                    </th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>
-                      Issuer
-                    </th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>
-                      Issue Date
-                    </th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>
-                      Status
-                    </th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600 }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {projects.map((project) => (
-                    <tr key={project.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.75rem' }}>
-                        <div>
-                          <div style={{ fontWeight: 500 }}>{project.name}</div>
+          <div className="projects-table-container">
+            <table className="projects-table">
+              <thead>
+                <tr>
+                  <th>Project Name</th>
+                  <th>Issuer</th>
+                  <th>Issue Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((project) => {
+                  const statusBadge = getStatusBadge(project);
+                  const isDeleting = deletingProjectId === project.id;
+                  
+                  return (
+                    <tr key={project.id}>
+                      <td>
+                        <div className="project-name-cell">
+                          <div className="project-name">{project.name}</div>
                           {project.description && (
-                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            <div className="project-description-small">
                               {project.description}
                             </div>
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: '0.75rem' }}>{project.issuer}</td>
-                      <td style={{ padding: '0.75rem' }}>{formatDate(project.issueDate)}</td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 500,
-                          backgroundColor: project.templatePdfPath 
-                            ? (project.qrCoordinates ? '#dcfce7' : '#fef3c7')
-                            : '#fef2f2',
-                          color: project.templatePdfPath 
-                            ? (project.qrCoordinates ? '#166534' : '#92400e')
-                            : '#991b1b'
-                        }}>
-                          {project.templatePdfPath 
-                            ? (project.qrCoordinates ? 'Ready' : 'Template Uploaded')
-                            : 'Setup Required'
-                          }
+                      <td className="project-issuer">{project.issuer}</td>
+                      <td className="project-date">{formatDate(project.issueDate)}</td>
+                      <td>
+                        <span className={statusBadge.className}>
+                          {statusBadge.text}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <td>
+                        <div className="project-actions">
                           <Link 
                             to={`/projects/${project.id}/step1`} 
-                            className="btn btn-secondary"
-                            style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}
+                            className="btn btn-sm btn-secondary"
                           >
+                            <Edit size={14} />
                             {project.templatePdfPath ? 'Edit' : 'Setup'}
                           </Link>
                           {project.templatePdfPath && project.qrCoordinates && (
                             <Link 
                               to={`/projects/${project.id}/step2`} 
-                              className="btn btn-primary"
-                              style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}
+                              className="btn btn-sm btn-primary"
                             >
                               Next Step
+                              <ArrowRight size={14} />
                             </Link>
                           )}
+                          <button
+                            onClick={() => handleDeleteProject(project.id, project.name)}
+                            disabled={isDeleting}
+                            className="btn btn-sm btn-danger"
+                            title="Delete project permanently"
+                          >
+                            {isDeleting ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

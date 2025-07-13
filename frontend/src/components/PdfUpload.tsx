@@ -14,17 +14,13 @@ const PdfUpload: React.FC<PdfUploadProps> = ({ project, onTemplateUploaded, onEr
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
-    // Check file type
     if (file.type !== 'application/pdf') {
       return 'Only PDF files are allowed';
     }
-
-    // Check file size (10MB limit)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       return 'File size must be less than 10MB';
     }
-
     return null;
   };
 
@@ -85,22 +81,16 @@ const PdfUpload: React.FC<PdfUploadProps> = ({ project, onTemplateUploaded, onEr
 
   return (
     <div>
-      <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
+      <h3 className="form-section-title">
         📄 Upload Certificate Template
       </h3>
 
       {/* Project Summary */}
-      <div style={{
-        padding: '1rem',
-        backgroundColor: '#f8fafc',
-        borderRadius: '0.5rem',
-        marginBottom: '2rem',
-        border: '1px solid #e2e8f0'
-      }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', fontWeight: 600 }}>
+      <div className="project-summary">
+        <h4 className="project-summary-title">
           📋 Project: {project.name}
         </h4>
-        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+        <div className="project-summary-details">
           <div>Issuer: {project.issuer}</div>
           <div>Issue Date: {new Date(project.issueDate).toLocaleDateString()}</div>
           {project.description && <div>Description: {project.description}</div>}
@@ -109,15 +99,11 @@ const PdfUpload: React.FC<PdfUploadProps> = ({ project, onTemplateUploaded, onEr
 
       {/* File Upload Area */}
       <div
-        className={`file-upload ${dragOver ? 'dragover' : ''}`}
+        className={`file-upload ${dragOver ? 'dragover' : ''} ${uploading ? 'uploading' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={handleClick}
-        style={{
-          opacity: uploading ? 0.6 : 1,
-          cursor: uploading ? 'not-allowed' : 'pointer'
-        }}
       >
         <input
           ref={fileInputRef}
@@ -130,7 +116,7 @@ const PdfUpload: React.FC<PdfUploadProps> = ({ project, onTemplateUploaded, onEr
 
         <div className="file-upload-icon">
           {uploading ? (
-            <div className="spinner" style={{ width: '3rem', height: '3rem' }} />
+            <div className="spinner" />
           ) : (
             '📄'
           )}
@@ -157,33 +143,23 @@ const PdfUpload: React.FC<PdfUploadProps> = ({ project, onTemplateUploaded, onEr
 
       {/* Current Template Info */}
       {project.templatePdfPath && (
-        <div style={{
-          marginTop: '2rem',
-          padding: '1rem',
-          backgroundColor: '#dcfce7',
-          borderRadius: '0.5rem',
-          border: '1px solid #bbf7d0'
-        }}>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: '#166534' }}>
-            ✅ Template Uploaded
-          </h4>
-          <div style={{ fontSize: '0.875rem', color: '#166534' }}>
-            Your certificate template has been uploaded successfully. 
-            You can upload a new one to replace it, or proceed to set QR code coordinates.
+        <div className="alert alert-success" style={{ marginTop: '2rem' }}>
+          <div>
+            <h4 style={{ margin: '0 0 0.5rem 0' }}>
+              ✅ Template Uploaded
+            </h4>
+            <div style={{ fontSize: '0.875rem' }}>
+              Your certificate template has been uploaded successfully. 
+              You can upload a new one to replace it, or proceed to set QR code coordinates.
+            </div>
           </div>
         </div>
       )}
 
       {/* Instructions */}
-      <div style={{
-        marginTop: '2rem',
-        padding: '1rem',
-        backgroundColor: '#eff6ff',
-        borderRadius: '0.5rem',
-        borderLeft: '4px solid #3b82f6'
-      }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>💡 Template Requirements</h4>
-        <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#374151' }}>
+      <div className="info-box" style={{ marginTop: '2rem' }}>
+        <h4 className="info-box-title">💡 Template Requirements</h4>
+        <ul className="info-box-list">
           <li>Upload a PDF file that will serve as your certificate template</li>
           <li>This template will be used for all certificates in this batch</li>
           <li>Make sure the template has space for a QR code (you'll set its position next)</li>

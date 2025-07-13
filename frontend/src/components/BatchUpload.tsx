@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Project, Batch, BatchBreakdown } from '../types';
+import { Batch } from '../types';
 import { projectApi } from '../services/api';
 import StepIndicator from './StepIndicator';
+import {
+  ArrowLeft,
+  ArrowRight,
+  X,
+  ClipboardList,
+  UploadCloud,
+  FileCheck2,
+  AlertTriangle,
+  FileX2,
+  FileUp,
+  Clock,
+  Package,
+  ListChecks,
+  FileWarning,
+} from 'lucide-react';
 
 const BatchUpload: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -175,22 +190,6 @@ const BatchUpload: React.FC = () => {
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatTime = (minutes: number): string => {
-    if (minutes < 1) return '< 1 minute';
-    if (minutes < 60) return `${Math.round(minutes)} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = Math.round(minutes % 60);
-    return `${hours}h ${remainingMinutes}m`;
-  };
-
   if (loading) {
     return (
       <div className="loading">
@@ -219,9 +218,21 @@ const BatchUpload: React.FC = () => {
         <div className="card-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="card-title">Upload Certificate Batch</h2>
-            <Link to={`/projects/${project.id}/step1`} className="btn btn-secondary">
-              ← Back to Step 1
-            </Link>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <Link to={`/projects/${project.id}/step1`} className="btn btn-secondary">
+                <ArrowLeft size={16} />
+                Back to Step 1
+              </Link>
+              {currentBatch && currentBatch.validationResults?.isValid && (
+                <button
+                  onClick={proceedToStep3}
+                  className="btn btn-primary"
+                >
+                  Continue to Step 3
+                  <ArrowRight size={16} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -229,17 +240,8 @@ const BatchUpload: React.FC = () => {
         {error && (
           <div className="alert alert-error">
             {error}
-            <button 
-              onClick={clearMessages}
-              style={{ 
-                float: 'right', 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer',
-                fontSize: '1.2rem'
-              }}
-            >
-              ×
+            <button onClick={clearMessages} className="alert-close">
+              <X size={18} />
             </button>
           </div>
         )}
@@ -247,33 +249,19 @@ const BatchUpload: React.FC = () => {
         {success && (
           <div className="alert alert-success">
             {success}
-            <button 
-              onClick={clearMessages}
-              style={{ 
-                float: 'right', 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer',
-                fontSize: '1.2rem'
-              }}
-            >
-              ×
+            <button onClick={clearMessages} className="alert-close">
+              <X size={18} />
             </button>
           </div>
         )}
 
         {/* Project Summary */}
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#f8fafc',
-          borderRadius: '0.5rem',
-          marginBottom: '2rem',
-          border: '1px solid #e2e8f0'
-        }}>
-          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', fontWeight: 600 }}>
-            📋 Project: {project.name}
+        <div className="project-summary">
+          <h3 className="project-summary-title">
+            <ClipboardList size={18} style={{ marginRight: '0.5rem' }} />
+            Project: {project.name}
           </h3>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+          <div className="project-summary-details">
             <div>Issuer: {project.issuer}</div>
             <div>Issue Date: {new Date(project.issueDate).toLocaleDateString()}</div>
             <div>Template: ✅ Uploaded</div>
@@ -282,15 +270,12 @@ const BatchUpload: React.FC = () => {
         </div>
 
         {/* Instructions */}
-        <div style={{
-          marginBottom: '2rem',
-          padding: '1rem',
-          backgroundColor: '#eff6ff',
-          borderRadius: '0.5rem',
-          borderLeft: '4px solid #3b82f6'
-        }}>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>📦 ZIP File Requirements</h4>
-          <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#374151' }}>
+        <div className="info-box">
+          <h4 className="info-box-title">
+            <Package size={18} style={{ marginRight: '0.5rem' }} />
+            ZIP File Requirements
+          </h4>
+          <ul className="info-box-list">
             <li>One Excel file (.xlsx or .xls) with certificate mapping</li>
             <li>Excel must contain columns: <strong>certificateId</strong> and <strong>filename</strong></li>
             <li>PDF files named exactly as specified in the Excel file</li>
@@ -322,7 +307,7 @@ const BatchUpload: React.FC = () => {
           />
 
           <div className="file-upload-icon">
-            {uploading ? '⏳' : '📁'}
+            {uploading ? <div className="spinner" /> : <UploadCloud />}
           </div>
 
           {uploading ? (
@@ -374,28 +359,29 @@ const BatchUpload: React.FC = () => {
         {/* Previous Batches */}
         {batches.length > 1 && (
           <div style={{ marginTop: '2rem' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Previous Batch Uploads</h3>
+            <h3 style={{ marginBottom: '1rem', color: '#ffffff' }}>Previous Batch Uploads</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {batches.slice(1).map((batch) => (
                 <div 
                   key={batch.id} 
                   style={{
                     padding: '0.75rem',
-                    backgroundColor: '#f8fafc',
+                    backgroundColor: '#2d3748',
                     borderRadius: '0.375rem',
-                    border: '1px solid #e2e8f0',
+                    border: '1px solid #4a5568',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    color: '#ffffff'
                   }}
                 >
                   <div>
                     <strong>{batch.name}</strong>
-                    <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                    <span style={{ marginLeft: '0.5rem', color: '#a0aec0' }}>
                       {batch.totalCertificates} certificates • {batch.status}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  <div style={{ fontSize: '0.875rem', color: '#a0aec0' }}>
                     {new Date(batch.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -418,7 +404,6 @@ interface BatchValidationResultsProps {
 const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({ 
   batch, 
   onReupload, 
-  onProceedToStep3 
 }) => {
   const validation = batch.validationResults;
   
@@ -435,65 +420,51 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
   };
 
   return (
-    <div style={{
-      marginTop: '2rem',
-      padding: '1.5rem',
-      backgroundColor: validation.isValid ? '#f0fdf4' : '#fef2f2',
-      borderRadius: '0.5rem',
-      border: `2px solid ${validation.isValid ? '#16a34a' : '#dc2626'}`
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-        <div style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>
-          {validation.isValid ? '✅' : '❌'}
+    <div className={`validation-results ${validation.isValid ? 'validation-success' : 'validation-error'}`}>
+      <div className="validation-header">
+        <div className="validation-icon">
+          {validation.isValid ? <FileCheck2 /> : <FileX2 />}
         </div>
-        <h3 style={{ margin: 0, color: validation.isValid ? '#16a34a' : '#dc2626' }}>
+        <h3 className="validation-title">
           {validation.isValid ? 'Validation Passed' : 'Validation Failed'}
         </h3>
       </div>
 
       {/* Validation Summary */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div>
-          <div style={{ fontWeight: 600 }}>Total Entries</div>
-          <div>{validation.totalEntries}</div>
+      <div className="validation-summary">
+        <div className="summary-item">
+          <div className="summary-label">Total Entries</div>
+          <div className="summary-value">{validation.totalEntries}</div>
         </div>
-        <div>
-          <div style={{ fontWeight: 600 }}>Valid Records</div>
-          <div style={{ color: '#16a34a' }}>{validation.validRecords}</div>
+        <div className="summary-item">
+          <div className="summary-label">Valid Records</div>
+          <div className="summary-value success-text">{validation.validRecords}</div>
         </div>
-        <div>
-          <div style={{ fontWeight: 600 }}>Invalid Records</div>
-          <div style={{ color: '#dc2626' }}>{validation.invalidRecords}</div>
+        <div className="summary-item">
+          <div className="summary-label">Invalid Records</div>
+          <div className="summary-value error-text">{validation.invalidRecords}</div>
         </div>
-        <div>
-          <div style={{ fontWeight: 600 }}>Estimated Time</div>
-          <div>{formatTime(validation.estimatedProcessingTime)}</div>
+        <div className="summary-item">
+          <div className="summary-label">
+            <Clock size={14} style={{ marginRight: '0.25rem' }} />
+            Estimated Time
+          </div>
+          <div className="summary-value">{formatTime(validation.estimatedProcessingTime)}</div>
         </div>
       </div>
 
       {/* Batch Breakdown */}
       {validation.batchBreakdown.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h4 style={{ marginBottom: '0.5rem' }}>Automatic Batch Breakdown</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="batch-breakdown">
+          <h4 className="breakdown-title">
+            <ListChecks size={18} style={{ marginRight: '0.5rem' }} />
+            Automatic Batch Breakdown
+          </h4>
+          <div className="breakdown-items">
             {validation.batchBreakdown.map((breakdown) => (
-              <div 
-                key={breakdown.batchNumber}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  backgroundColor: '#ffffff',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
-              >
+              <div key={breakdown.batchNumber} className="breakdown-item">
                 Batch {breakdown.batchNumber}: {breakdown.certificateCount} certs 
-                <span style={{ color: '#6b7280' }}> ({formatTime(breakdown.estimatedTime)})</span>
+                <span className="breakdown-time"> ({formatTime(breakdown.estimatedTime)})</span>
               </div>
             ))}
           </div>
@@ -502,11 +473,14 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
 
       {/* Validation Errors */}
       {validation.errors.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h4 style={{ marginBottom: '0.5rem', color: '#dc2626' }}>Validation Errors</h4>
-          <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
+        <div className="validation-errors">
+          <h4 className="error-title">
+            <AlertTriangle size={18} style={{ marginRight: '0.5rem' }} />
+            Validation Errors
+          </h4>
+          <ul className="error-list">
             {validation.errors.map((error, index) => (
-              <li key={index} style={{ color: '#dc2626', marginBottom: '0.25rem' }}>
+              <li key={index} className="error-item">
                 {error}
               </li>
             ))}
@@ -516,40 +490,30 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
 
       {/* Missing/Extra PDF Details */}
       {(validation.missingPdfs.length > 0 || validation.extraPdfs.length > 0) && (
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className="pdf-details">
           {validation.missingPdfs.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <h5 style={{ color: '#dc2626' }}>Missing PDF Files ({validation.missingPdfs.length})</h5>
-              <div style={{ 
-                maxHeight: '100px', 
-                overflowY: 'auto', 
-                fontSize: '0.875rem',
-                backgroundColor: '#ffffff',
-                padding: '0.5rem',
-                borderRadius: '0.25rem',
-                border: '1px solid #fecaca'
-              }}>
+            <div className="pdf-section">
+              <h5 className="pdf-section-title error-text">
+                <FileX2 size={16} style={{ marginRight: '0.5rem' }} />
+                Missing PDF Files ({validation.missingPdfs.length})
+              </h5>
+              <div className="pdf-list">
                 {validation.missingPdfs.map((pdf, index) => (
-                  <div key={index}>{pdf}</div>
+                  <div key={index} className="pdf-item">{pdf}</div>
                 ))}
               </div>
             </div>
           )}
 
           {validation.extraPdfs.length > 0 && (
-            <div>
-              <h5 style={{ color: '#f59e0b' }}>Extra PDF Files ({validation.extraPdfs.length})</h5>
-              <div style={{ 
-                maxHeight: '100px', 
-                overflowY: 'auto', 
-                fontSize: '0.875rem',
-                backgroundColor: '#ffffff',
-                padding: '0.5rem',
-                borderRadius: '0.25rem',
-                border: '1px solid #fed7aa'
-              }}>
+            <div className="pdf-section">
+              <h5 className="pdf-section-title warning-text">
+                <FileWarning size={16} style={{ marginRight: '0.5rem' }} />
+                Extra PDF Files ({validation.extraPdfs.length})
+              </h5>
+              <div className="pdf-list">
                 {validation.extraPdfs.map((pdf, index) => (
-                  <div key={index}>{pdf}</div>
+                  <div key={index} className="pdf-item">{pdf}</div>
                 ))}
               </div>
             </div>
@@ -558,23 +522,14 @@ const BatchValidationResults: React.FC<BatchValidationResultsProps> = ({
       )}
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '1rem' }}>
+      <div className="validation-actions">
         {!validation.isValid && (
           <button
             onClick={onReupload}
             className="btn btn-secondary"
           >
-            📁 Upload Corrected ZIP
-          </button>
-        )}
-
-        {validation.isValid && (
-          <button
-            onClick={onProceedToStep3}
-            className="btn btn-primary"
-            style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
-          >
-            Continue to Step 3: Issue Certificates →
+            <FileUp size={16} />
+            Upload Corrected ZIP
           </button>
         )}
       </div>
