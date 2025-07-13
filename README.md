@@ -1,11 +1,3 @@
-## 📋 Table of Contents
-
-- [Features Implemented](#features-implemented)
-- [Technologies Used](#technologies-used)
-- [Setup Instructions](#setup-instructions)
-- [Optional Features Attempted](#optional-features-attempted)
-- [Project Structure](#project-structure)
-
 ## ✨ Features Implemented
 
 ### 🎯 **Step 1: Project Creation & Template Upload**
